@@ -1,0 +1,42 @@
+name: Update Fund Data
+
+on:
+  schedule:
+    # Run daily at 6pm SGT (10:00 UTC) - after market close
+    - cron: '0 10 * * 1-5'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests openpyxl pdfplumber
+
+      - name: Download latest fund prices
+        run: python download_prices.py
+
+      - name: Extract fact sheet data
+        run: python extract_facts.py
+
+      - name: Commit and push updated data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add fund_data.js fund_facts.js
+          if git diff --staged --quiet; then
+            echo "No data changes detected"
+          else
+            git commit -m "Update fund data $(date +'%Y-%m-%d')"
+            git push
+          fi

@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Great Eastern Fund - 基金分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        :root {
+            --primary: #c41230;
+            --primary-light: #e8143a;
+            --bg: #f5f7fa;
+            --card: #ffffff;
+            --text: #1a1a2e;
+            --text-light: #6b7280;
+            --border: #e5e7eb;
+            --green: #10b981;
+            --red: #ef4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, #8b0a20 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        .header h1 { font-size: 22px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+        .header .stats { text-align: right; font-size: 13px; opacity: 0.85; }
+        .container { display: flex; height: calc(100vh - 75px); }
+
+        /* Left Panel - Fund Selector */
+        .sidebar {
+            width: 380px;
+            min-width: 380px;
+            background: var(--card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .search-box {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .search-box input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+        }
+        .search-box input:focus { border-color: var(--primary); }
+        .filter-bar {
+            padding: 8px 15px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .filter-btn {
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 11px;
+            cursor: pointer;
+            background: white;
+            color: var(--text-light);
+            transition: all 0.15s;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        .fund-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 5px 0;
+        }
+        .fund-item {
+            padding: 8px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background 0.1s;
+            font-size: 12.5px;
+        }
+        .fund-item:hover { background: #f9fafb; }
+        .fund-item.selected { background: #fef2f2; border-left: 3px solid var(--primary); }
+        .fund-item .fund-name { flex: 1; line-height: 1.3; }
+        .fund-item .fund-meta {
+            text-align: right;
+            font-size: 11px;
+            color: var(--text-light);
+            min-width: 70px;
+            margin-left: 8px;
+        }
+        .fund-item .fund-meta .price { font-weight: 600; color: var(--text); }
+        .fund-item .fund-meta .change { font-size: 11px; }
+        .change.positive { color: var(--green); }
+        .change.negative { color: var(--red); }
+        .selected-count {
+            padding: 8px 15px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-light);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f9fafb;
+        }
+        .clear-btn {
+            padding: 3px 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+
+        /* Right Panel - Charts and Analysis */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .card {
+            background: var(--card);
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            padding: 20px;
+            border: 1px solid var(--border);
+        }
+        .card h2 {
+            font-size: 15px;
+            margin-bottom: 15px;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chart-container { position: relative; height: 400px; }
+        .chart-controls {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .chart-btn {
+            padding: 5px 14px;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            font-size: 12px;
+            cursor: pointer;
+            background: white;
+            transition: all 0.15s;
+        }
+        .chart-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .chart-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        /* Performance Table */
+        .perf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+        }
+        .perf-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: #f9fafb;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            font-size: 11.5px;
+            color: var(--text-light);
+            letter-spacing: 0.3px;
+        }
+        .perf-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .perf-table tr:hover { background: #fafbfc; }
+        .perf-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .badge-currency { background: #eff6ff; color: #3b82f6; }
+        .empty-state {
+            text-align: center;
+            padding: 80px 30px;
+            color: var(--text-light);
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 15px; }
+        .empty-state h3 { margin-bottom: 8px; color: var(--text); }
+        /* Fund info panel */
+        .fund-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .info-card {
+            padding: 12px;
+            background: #f9fafb;
+            border-radius: 6px;
+            border: 1px solid #f0f0f0;
+        }
+        .info-card .label { font-size: 10.5px; color: var(--text-light); text-transform: uppercase; letter-spacing: 0.3px; }
+        .info-card .value { font-size: 16px; font-weight: 600; margin-top: 4px; }
+
+        /* Price History Table */
+        .price-history-wrapper {
+            max-height: 600px;
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .price-history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+        }
+        .price-history-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            background: #1a1a2e;
+            color: white;
+            padding: 10px 14px;
+            text-align: right;
+            font-weight: 600;
+            font-size: 11px;
+            white-space: nowrap;
+            border-bottom: 2px solid var(--primary);
+        }
+        .price-history-table thead th:first-child {
+            text-align: left;
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            background: #1a1a2e;
+            min-width: 100px;
+        }
+        .price-history-table thead th .th-currency {
+            display: block;
+            font-size: 9.5px;
+            font-weight: 400;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+        .price-history-table tbody td {
+            padding: 6px 14px;
+            text-align: right;
+            border-bottom: 1px solid #f3f4f6;
+            white-space: nowrap;
+        }
+        .price-history-table tbody td:first-child {
+            text-align: left;
+            font-weight: 500;
+            color: var(--text-light);
+            position: sticky;
+            left: 0;
+            background: inherit;
+            z-index: 1;
+        }
+        .price-history-table tbody tr:nth-child(even) { background: #fafbfc; }
+        .price-history-table tbody tr:nth-child(odd) { background: #ffffff; }
+        .price-history-table tbody tr:hover { background: #fef2f2 !important; }
+        .price-history-table tbody td.no-data { color: #d1d5db; text-align: center; }
+        .price-history-table .price-chg {
+            font-size: 10px;
+            margin-left: 4px;
+        }
+
+        /* Fact Sheet Info Panel */
+        .fact-sheet-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .fact-section {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #f0f0f0;
+        }
+        .fact-section.full-width {
+            grid-column: 1 / -1;
+        }
+        .fact-section h3 {
+            font-size: 13px;
+            color: var(--primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .fact-section p {
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: var(--text);
+        }
+        .fact-kv {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 6px 12px;
+            font-size: 12.5px;
+        }
+        .fact-kv .k {
+            color: var(--text-light);
+            font-weight: 500;
+        }
+        .fact-kv .v {
+            color: var(--text);
+            font-weight: 600;
+        }
+        .holdings-list {
+            list-style: none;
+            padding: 0;
+        }
+        .holdings-list li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 12px;
+        }
+        .holdings-list li:last-child { border-bottom: none; }
+        .holdings-list .hl-name { flex: 1; color: var(--text); }
+        .holdings-list .hl-bar {
+            width: 80px;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            margin: 0 10px;
+            overflow: hidden;
+        }
+        .holdings-list .hl-bar-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 3px;
+        }
+        .holdings-list .hl-pct {
+            min-width: 45px;
+            text-align: right;
+            font-weight: 600;
+            color: var(--text);
+            font-size: 11.5px;
+        }
+        .alloc-bar-chart .alloc-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            font-size: 11.5px;
+        }
+        .alloc-bar-chart .alloc-label {
+            width: 140px;
+            text-align: right;
+            padding-right: 10px;
+            color: var(--text-light);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .alloc-bar-chart .alloc-bar {
+            flex: 1;
+            height: 16px;
+            background: #e5e7eb;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .alloc-bar-chart .alloc-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #e8143a);
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            padding-left: 6px;
+            color: white;
+            font-size: 10px;
+            font-weight: 600;
+            min-width: 30px;
+        }
+        .fact-perf-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+        .fact-perf-table th {
+            padding: 6px 10px;
+            background: #1a1a2e;
+            color: white;
+            font-weight: 600;
+            text-align: center;
+            font-size: 11px;
+        }
+        .fact-perf-table td {
+            padding: 6px 10px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+        }
+        .fulltext-box {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 14px;
+            font-size: 11.5px;
+            line-height: 1.6;
+            color: var(--text-light);
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Great Eastern Fund</h1>
+            <div class="subtitle">基金表现分析工具</div>
+        </div>
+        <div class="stats" id="headerStats">加载数据中...</div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="搜索基金名称..." oninput="filterFunds()">
+            </div>
+            <div class="filter-bar" id="filterBar">
+                <span class="filter-btn active" onclick="setFilter('all')">全部</span>
+                <span class="filter-btn" onclick="setFilter('GreatLink')">GreatLink</span>
+                <span class="filter-btn" onclick="setFilter('BlackRock')">BlackRock</span>
+                <span class="filter-btn" onclick="setFilter('Fidelity')">Fidelity</span>
+                <span class="filter-btn" onclick="setFilter('JPM')">JPM</span>
+                <span class="filter-btn" onclick="setFilter('LionGlobal')">LionGlobal</span>
+                <span class="filter-btn" onclick="setFilter('Schroder')">Schroder</span>
+                <span class="filter-btn" onclick="setFilter('Templeton')">Templeton</span>
+                <span class="filter-btn" onclick="setFilter('abrdn')">abrdn</span>
+                <span class="filter-btn" onclick="setFilter('Allianz')">Allianz</span>
+                <span class="filter-btn" onclick="setFilter('Janus')">Janus Henderson</span>
+                <span class="filter-btn" onclick="setFilter('Pimco')">Pimco</span>
+            </div>
+            <div class="fund-list" id="fundList"></div>
+            <div class="selected-count">
+                <span id="selectedInfo">已选择 0 只基金</span>
+                <button class="clear-btn" onclick="clearSelection()">清除全部</button>
+            </div>
+        </div>
+
+        <div class="main" id="mainContent">
+            <div class="empty-state" id="emptyState">
+                <div class="icon">📊</div>
+                <h3>选择基金进行分析</h3>
+                <p>点击左侧面板中的基金查看表现。<br>
+                可同时选择多只基金进行对比分析。</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="fund_data.js"></script>
+    <script src="fund_facts.js"></script>
+    <script>
+    // ============================================================
+    // State
+    // ============================================================
+    let selectedFunds = [];
+    let currentFilter = 'all';
+    let priceChart = null;
+    let perfChart = null;
+    const COLORS = [
+        '#c41230','#2563eb','#059669','#d97706','#7c3aed','#db2777',
+        '#0891b2','#65a30d','#dc2626','#4f46e5','#0d9488','#ea580c',
+        '#8b5cf6','#06b6d4','#84cc16','#f43f5e','#6366f1','#14b8a6'
+    ];
+
+    // ============================================================
+    // Data Processing
+    // ============================================================
+    function parseFundData() {
+        const fundNames = Object.keys(FUND_DATA).sort();
+        return fundNames.map(name => {
+            const fund = FUND_DATA[name];
+            const prices = fund.prices;
+            if (!prices || prices.length === 0) return null;
+
+            // Parse dates - format is dd/MM/yyyy
+            const parsed = prices.map(p => {
+                const parts = p.date.split('/');
+                const date = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+                return { date, price: p.price, currency: p.currency };
+            }).sort((a, b) => a.date - b.date);
+
+            const latest = parsed[parsed.length - 1];
+            const oldest = parsed[0];
+            const change1Y = ((latest.price - oldest.price) / oldest.price * 100);
+
+            // 1-month, 3-month, 6-month performance
+            const now = latest.date;
+            const find = (months) => {
+                const target = new Date(now);
+                target.setMonth(target.getMonth() - months);
+                let closest = parsed[0];
+                for (const p of parsed) {
+                    if (Math.abs(p.date - target) < Math.abs(closest.date - target)) closest = p;
+                }
+                return closest;
+            };
+
+            const m1 = find(1);
+            const m3 = find(3);
+            const m6 = find(6);
+
+            return {
+                name,
+                code: fund.code,
+                currency: fund.currency,
+                latestPrice: latest.price,
+                latestDate: latest.date,
+                change1M: ((latest.price - m1.price) / m1.price * 100),
+                change3M: ((latest.price - m3.price) / m3.price * 100),
+                change6M: ((latest.price - m6.price) / m6.price * 100),
+                change1Y: change1Y,
+                prices: parsed,
+                high52w: Math.max(...parsed.map(p => p.price)),
+                low52w: Math.min(...parsed.map(p => p.price)),
+                dataPoints: parsed.length
+            };
+        }).filter(f => f !== null);
+    }
+
+    const allFunds = parseFundData();
+
+    // ============================================================
+    // Sidebar - Fund List
+    // ============================================================
+    function renderFundList() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const list = document.getElementById('fundList');
+
+        const filtered = allFunds.filter(f => {
+            const matchesSearch = f.name.toLowerCase().includes(search);
+            const matchesFilter = currentFilter === 'all' || f.name.toLowerCase().includes(currentFilter.toLowerCase());
+            return matchesSearch && matchesFilter;
+        });
+
+        list.innerHTML = filtered.map(f => {
+            const isSelected = selectedFunds.includes(f.name);
+            const changeClass = f.change1Y >= 0 ? 'positive' : 'negative';
+            const changeSign = f.change1Y >= 0 ? '+' : '';
+            return `<div class="fund-item ${isSelected ? 'selected' : ''}" onclick="toggleFund('${f.name.replace(/'/g, "\\'")}')">
+                <div class="fund-name">${f.name}</div>
+                <div class="fund-meta">
+                    <div class="price">${f.currency} ${f.latestPrice.toFixed(3)}</div>
+                    <div class="change ${changeClass}">${changeSign}${f.change1Y.toFixed(2)}%</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function filterFunds() { renderFundList(); }
+
+    function setFilter(filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+        renderFundList();
+    }
+
+    function toggleFund(name) {
+        const idx = selectedFunds.indexOf(name);
+        if (idx >= 0) selectedFunds.splice(idx, 1);
+        else selectedFunds.push(name);
+        renderFundList();
+        updateSelectedInfo();
+        renderAnalysis();
+    }
+
+    function clearSelection() {
+        selectedFunds = [];
+        renderFundList();
+        updateSelectedInfo();
+        renderAnalysis();
+    }
+
+    function updateSelectedInfo() {
+        document.getElementById('selectedInfo').textContent = `已选择 ${selectedFunds.length} 只基金`;
+    }
+
+    // ============================================================
+    // Main Panel - Analysis
+    // ============================================================
+    let chartMode = 'price'; // 'price' or 'normalized'
+
+    function renderAnalysis() {
+        const main = document.getElementById('mainContent');
+
+        if (selectedFunds.length === 0) {
+            main.innerHTML = `<div class="empty-state" id="emptyState">
+                <div class="icon">📊</div>
+                <h3>选择基金进行分析</h3>
+                <p>点击左侧面板中的基金查看表现。<br>
+                可同时选择多只基金进行对比分析。</p>
+            </div>`;
+            return;
+        }
+
+        const funds = selectedFunds.map(n => allFunds.find(f => f.name === n)).filter(Boolean);
+
+        main.innerHTML = `
+            <div class="card">
+                <h2>📈 价格走势</h2>
+                <div class="chart-controls">
+                    <span class="chart-btn ${chartMode === 'price' ? 'active' : ''}" onclick="setChartMode('price')">绝对价格</span>
+                    <span class="chart-btn ${chartMode === 'normalized' ? 'active' : ''}" onclick="setChartMode('normalized')">归一化 (基准100)</span>
+                </div>
+                <div class="chart-container"><canvas id="priceChart"></canvas></div>
+            </div>
+
+            <div class="card">
+                <h2>📊 业绩对比</h2>
+                <div class="chart-container" style="height:${Math.max(200, funds.length * 35 + 80)}px"><canvas id="perfChart"></canvas></div>
+            </div>
+
+            <div class="card">
+                <h2>📋 业绩摘要</h2>
+                <div style="overflow-x:auto">
+                <table class="perf-table">
+                    <thead>
+                        <tr>
+                            <th>基金名称</th>
+                            <th>货币</th>
+                            <th class="num">最新价格</th>
+                            <th class="num">52周最高</th>
+                            <th class="num">52周最低</th>
+                            <th class="num">1月%</th>
+                            <th class="num">3月%</th>
+                            <th class="num">6月%</th>
+                            <th class="num">1年%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${funds.map(f => `<tr>
+                            <td>${f.name}</td>
+                            <td><span class="badge badge-currency">${f.currency}</span></td>
+                            <td class="num">${f.latestPrice.toFixed(3)}</td>
+                            <td class="num">${f.high52w.toFixed(3)}</td>
+                            <td class="num">${f.low52w.toFixed(3)}</td>
+                            <td class="num"><span class="change ${f.change1M >= 0 ? 'positive' : 'negative'}">${f.change1M >= 0 ? '+' : ''}${f.change1M.toFixed(2)}%</span></td>
+                            <td class="num"><span class="change ${f.change3M >= 0 ? 'positive' : 'negative'}">${f.change3M >= 0 ? '+' : ''}${f.change3M.toFixed(2)}%</span></td>
+                            <td class="num"><span class="change ${f.change6M >= 0 ? 'positive' : 'negative'}">${f.change6M >= 0 ? '+' : ''}${f.change6M.toFixed(2)}%</span></td>
+                            <td class="num"><span class="change ${f.change1Y >= 0 ? 'positive' : 'negative'}">${f.change1Y >= 0 ? '+' : ''}${f.change1Y.toFixed(2)}%</span></td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📅 价格历史</h2>
+                <div class="price-history-wrapper" id="priceHistoryTable"></div>
+            </div>
+
+            ${funds.length === 1 ? renderSingleFundInfo(funds[0]) : ''}
+        `;
+
+        renderPriceChart(funds);
+        renderPerfChart(funds);
+        renderPriceHistoryTable(funds);
+    }
+
+    // ============================================================
+    // Price History Table
+    // ============================================================
+    function renderPriceHistoryTable(funds) {
+        const container = document.getElementById('priceHistoryTable');
+        if (!container || funds.length === 0) return;
+
+        // Collect all unique dates across all selected funds
+        const dateMap = new Map(); // ISO date string -> { date, fundName: price, ... }
+
+        funds.forEach(fund => {
+            fund.prices.forEach(p => {
+                const key = p.date.toISOString().split('T')[0];
+                if (!dateMap.has(key)) {
+                    dateMap.set(key, { date: p.date });
+                }
+                dateMap.get(key)[fund.name] = p.price;
+            });
+        });
+
+        // Sort dates descending (newest first)
+        const sortedDates = Array.from(dateMap.values())
+            .sort((a, b) => b.date - a.date);
+
+        // Build price lookup for previous day to calculate daily change
+        const prevPriceMap = {};
+        funds.forEach(f => { prevPriceMap[f.name] = {}; });
+        funds.forEach(fund => {
+            const sorted = fund.prices.slice().sort((a, b) => a.date - b.date);
+            for (let i = 1; i < sorted.length; i++) {
+                const key = sorted[i].date.toISOString().split('T')[0];
+                prevPriceMap[fund.name][key] = sorted[i - 1].price;
+            }
+        });
+
+        // Build table
+        let html = '<table class="price-history-table"><thead><tr>';
+        html += '<th>日期</th>';
+        funds.forEach(f => {
+            const shortName = f.name.length > 30 ? f.name.substring(0, 28) + '...' : f.name;
+            html += `<th>${shortName}<span class="th-currency">${f.currency}</span></th>`;
+        });
+        html += '</tr></thead><tbody>';
+
+        sortedDates.forEach(row => {
+            const d = row.date;
+            const dd = d.getDate().toString().padStart(2, '0');
+            const mm = (d.getMonth() + 1).toString().padStart(2, '0');
+            const yyyy = d.getFullYear();
+            const dateStr = `${dd}/${mm}/${yyyy}`;
+            const isoKey = d.toISOString().split('T')[0];
+
+            html += `<tr><td>${dateStr}</td>`;
+            funds.forEach(f => {
+                const price = row[f.name];
+                if (price !== undefined) {
+                    const prev = prevPriceMap[f.name][isoKey];
+                    let chgHtml = '';
+                    if (prev !== undefined && prev !== 0) {
+                        const chg = ((price - prev) / prev * 100);
+                        const cls = chg >= 0 ? 'positive' : 'negative';
+                        const sign = chg >= 0 ? '+' : '';
+                        chgHtml = `<span class="price-chg change ${cls}">${sign}${chg.toFixed(2)}%</span>`;
+                    }
+                    html += `<td>${price.toFixed(4)}${chgHtml}</td>`;
+                } else {
+                    html += '<td class="no-data">-</td>';
+                }
+            });
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function findFactSheet(fundName) {
+        if (typeof FUND_FACTS === 'undefined') return null;
+        // Try exact match first
+        if (FUND_FACTS[fundName]) return FUND_FACTS[fundName];
+        // Try partial match
+        const lower = fundName.toLowerCase();
+        for (const key of Object.keys(FUND_FACTS)) {
+            if (lower.includes(key.toLowerCase()) || key.toLowerCase().includes(lower)) {
+                return FUND_FACTS[key];
+            }
+        }
+        // Try matching by removing common suffixes
+        const simplified = fundName.replace(/\s*(SGD|USD|EUR|GBP|AUD|JPY)\s*$/i, '').trim();
+        for (const key of Object.keys(FUND_FACTS)) {
+            const keySim = key.replace(/\s*(SGD|USD|EUR|GBP|AUD|JPY)\s*$/i, '').trim();
+            if (simplified.toLowerCase() === keySim.toLowerCase()) return FUND_FACTS[key];
+        }
+        return null;
+    }
+
+    function renderSingleFundInfo(fund) {
+        const volatility = calcVolatility(fund.prices);
+        const maxDrawdown = calcMaxDrawdown(fund.prices);
+        const facts = findFactSheet(fund.name);
+
+        let html = `<div class="card">
+            <h2>📄 基金详情: ${fund.name}</h2>
+            <div class="fact-sheet-grid">`;
+
+        // === Key Metrics Card ===
+        html += `<div class="fact-section">
+            <h3>📊 关键指标</h3>
+            <div class="fact-kv">
+                <span class="k">基金代码</span><span class="v">${fund.code}</span>
+                <span class="k">货币</span><span class="v">${fund.currency}</span>
+                <span class="k">最新价格</span><span class="v">${fund.latestPrice.toFixed(3)}</span>
+                <span class="k">最新日期</span><span class="v">${fund.latestDate.toLocaleDateString('zh-CN')}</span>
+                <span class="k">52周最高</span><span class="v">${fund.high52w.toFixed(3)}</span>
+                <span class="k">52周最低</span><span class="v">${fund.low52w.toFixed(3)}</span>
+                <span class="k">年化波动率</span><span class="v">${volatility.toFixed(2)}%</span>
+                <span class="k">最大回撤</span><span class="v change negative">${maxDrawdown.toFixed(2)}%</span>
+                <span class="k">数据点数</span><span class="v">${fund.dataPoints}</span>`;
+
+        if (facts) {
+            if (facts.fundSize) html += `<span class="k">基金规模</span><span class="v">${facts.fundSize}</span>`;
+            if (facts.inceptionDate) html += `<span class="k">成立日期</span><span class="v">${facts.inceptionDate}</span>`;
+            if (facts.fundManager) html += `<span class="k">基金经理</span><span class="v">${facts.fundManager}</span>`;
+            if (facts.baseCurrency) html += `<span class="k">基础货币</span><span class="v">${facts.baseCurrency}</span>`;
+            if (facts.managementFee) html += `<span class="k">管理费</span><span class="v">${facts.managementFee}%</span>`;
+        }
+        html += `</div></div>`;
+
+        // === Fund Intro / Objective ===
+        if (facts && facts.objective) {
+            html += `<div class="fact-section">
+                <h3>📝 基金简介</h3>
+                <p>${facts.objective}</p>
+            </div>`;
+        }
+
+        // === Past Performance (from fact sheet) ===
+        if (facts && facts.performance && Object.keys(facts.performance).length > 0) {
+            const p = facts.performance;
+            html += `<div class="fact-section full-width">
+                <h3>📈 历史业绩 (来自基金说明书)</h3>
+                <table class="fact-perf-table">
+                    <thead><tr>`;
+            const labels = { ytd: '年初至今', '1y': '1年', '3y': '3年', '5y': '5年', '10y': '10年', since_inception: '成立以来' };
+            const keys = Object.keys(p);
+            keys.forEach(k => { html += `<th>${labels[k] || k}</th>`; });
+            html += `</tr></thead><tbody><tr>`;
+            keys.forEach(k => {
+                const val = p[k];
+                const cls = val >= 0 ? 'positive' : 'negative';
+                html += `<td><span class="change ${cls}">${val >= 0 ? '+' : ''}${val.toFixed(2)}%</span></td>`;
+            });
+            html += `</tr></tbody></table>
+            </div>`;
+        }
+
+        // === Top Holdings ===
+        if (facts && facts.topHoldings && facts.topHoldings.length > 0) {
+            const maxPct = Math.max(...facts.topHoldings.map(h => h.pct));
+            html += `<div class="fact-section">
+                <h3>🏢 主要持仓</h3>
+                <ul class="holdings-list">`;
+            facts.topHoldings.forEach(h => {
+                const barWidth = (h.pct / maxPct * 100).toFixed(0);
+                html += `<li>
+                    <span class="hl-name">${h.name}</span>
+                    <span class="hl-bar"><span class="hl-bar-fill" style="width:${barWidth}%"></span></span>
+                    <span class="hl-pct">${h.pct.toFixed(1)}%</span>
+                </li>`;
+            });
+            html += `</ul></div>`;
+        }
+
+        // === Sector Allocation ===
+        if (facts && facts.sectorAllocation && facts.sectorAllocation.length > 0) {
+            const maxPct = Math.max(...facts.sectorAllocation.map(s => s.pct));
+            html += `<div class="fact-section">
+                <h3>🏭 行业分布</h3>
+                <div class="alloc-bar-chart">`;
+            facts.sectorAllocation.forEach(s => {
+                const barWidth = (s.pct / maxPct * 100).toFixed(0);
+                html += `<div class="alloc-row">
+                    <span class="alloc-label" title="${s.name}">${s.name}</span>
+                    <span class="alloc-bar"><span class="alloc-bar-fill" style="width:${barWidth}%">${s.pct.toFixed(1)}%</span></span>
+                </div>`;
+            });
+            html += `</div></div>`;
+        }
+
+        // === Geographic Allocation ===
+        if (facts && facts.geoAllocation && facts.geoAllocation.length > 0) {
+            const maxPct = Math.max(...facts.geoAllocation.map(g => g.pct));
+            html += `<div class="fact-section">
+                <h3>🌍 地区分布</h3>
+                <div class="alloc-bar-chart">`;
+            facts.geoAllocation.forEach(g => {
+                const barWidth = (g.pct / maxPct * 100).toFixed(0);
+                html += `<div class="alloc-row">
+                    <span class="alloc-label" title="${g.name}">${g.name}</span>
+                    <span class="alloc-bar"><span class="alloc-bar-fill" style="width:${barWidth}%">${g.pct.toFixed(1)}%</span></span>
+                </div>`;
+            });
+            html += `</div></div>`;
+        }
+
+        // === Full Fact Sheet Text ===
+        if (facts && facts.fullText) {
+            html += `<div class="fact-section full-width">
+                <h3>📑 基金说明书原文</h3>
+                <div class="fulltext-box">${facts.fullText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+            </div>`;
+        }
+
+        html += `</div></div>`;
+        return html;
+    }
+
+    function calcVolatility(prices) {
+        if (prices.length < 2) return 0;
+        const returns = [];
+        for (let i = 1; i < prices.length; i++) {
+            returns.push(Math.log(prices[i].price / prices[i-1].price));
+        }
+        const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+        const variance = returns.reduce((a, b) => a + (b - mean) ** 2, 0) / (returns.length - 1);
+        return Math.sqrt(variance) * Math.sqrt(252) * 100;
+    }
+
+    function calcMaxDrawdown(prices) {
+        let peak = -Infinity;
+        let maxDD = 0;
+        for (const p of prices) {
+            if (p.price > peak) peak = p.price;
+            const dd = (p.price - peak) / peak * 100;
+            if (dd < maxDD) maxDD = dd;
+        }
+        return maxDD;
+    }
+
+    // ============================================================
+    // Charts
+    // ============================================================
+    function setChartMode(mode) {
+        chartMode = mode;
+        renderAnalysis();
+    }
+
+    function renderPriceChart(funds) {
+        const ctx = document.getElementById('priceChart');
+        if (!ctx) return;
+
+        if (priceChart) priceChart.destroy();
+
+        const datasets = funds.map((fund, i) => {
+            const color = COLORS[i % COLORS.length];
+            let data;
+            if (chartMode === 'normalized') {
+                const basePrice = fund.prices[0].price;
+                data = fund.prices.map(p => ({ x: p.date, y: (p.price / basePrice) * 100 }));
+            } else {
+                data = fund.prices.map(p => ({ x: p.date, y: p.price }));
+            }
+            return {
+                label: fund.name,
+                data,
+                borderColor: color,
+                backgroundColor: color + '15',
+                borderWidth: 1.8,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                fill: funds.length === 1,
+                tension: 0.1
+            };
+        });
+
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { font: { size: 11 }, boxWidth: 14, padding: 12 }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0,0,0,0.85)',
+                        titleFont: { size: 12 },
+                        bodyFont: { size: 11 },
+                        padding: 10,
+                        callbacks: {
+                            title: items => items[0]?.raw?.x ? new Date(items[0].raw.x).toLocaleDateString('zh-CN') : '',
+                            label: item => `${item.dataset.label}: ${chartMode === 'normalized' ? item.raw.y.toFixed(2) : item.raw.y.toFixed(3)}`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'time',
+                        time: { unit: 'month', displayFormats: { month: 'yyyy-MM' } },
+                        grid: { display: false },
+                        ticks: { font: { size: 11 } }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: chartMode === 'normalized' ? '归一化 (基准100)' : '价格',
+                            font: { size: 11 }
+                        },
+                        grid: { color: '#f0f0f0' },
+                        ticks: { font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderPerfChart(funds) {
+        const ctx = document.getElementById('perfChart');
+        if (!ctx) return;
+
+        if (perfChart) perfChart.destroy();
+
+        const labels = funds.map(f => f.name.length > 40 ? f.name.substring(0, 38) + '...' : f.name);
+
+        perfChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: '1月',
+                        data: funds.map(f => f.change1M),
+                        backgroundColor: '#93c5fd',
+                        borderRadius: 2
+                    },
+                    {
+                        label: '3月',
+                        data: funds.map(f => f.change3M),
+                        backgroundColor: '#60a5fa',
+                        borderRadius: 2
+                    },
+                    {
+                        label: '6月',
+                        data: funds.map(f => f.change6M),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 2
+                    },
+                    {
+                        label: '1年',
+                        data: funds.map(f => f.change1Y),
+                        backgroundColor: funds.map(f => f.change1Y >= 0 ? '#10b981' : '#ef4444'),
+                        borderRadius: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } },
+                    tooltip: {
+                        callbacks: {
+                            label: item => `${item.dataset.label}: ${item.raw >= 0 ? '+' : ''}${item.raw.toFixed(2)}%`
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        title: { display: true, text: '回报率 (%)', font: { size: 11 } },
+                        grid: { color: '#f0f0f0' },
+                        ticks: {
+                            font: { size: 11 },
+                            callback: v => v + '%'
+                        }
+                    },
+                    y: {
+                        ticks: { font: { size: 10.5 } },
+                        grid: { display: false }
+                    }
+                }
+            }
+        });
+    }
+
+    // ============================================================
+    // Init
+    // ============================================================
+    function init() {
+        const totalFunds = allFunds.length;
+        const avgReturn = (allFunds.reduce((s, f) => s + f.change1Y, 0) / totalFunds).toFixed(2);
+        const latestDate = allFunds.length > 0 ? allFunds[0].latestDate.toLocaleDateString('zh-CN') : 'N/A';
+        document.getElementById('headerStats').innerHTML =
+            `共 ${totalFunds} 只基金 | 平均1年回报: ${avgReturn}% | 截至 ${latestDate}`;
+        renderFundList();
+    }
+
+    init();
+    </script>
+</body>
+</html>
