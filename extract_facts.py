@@ -6,8 +6,9 @@ import re
 import json
 import pdfplumber
 
-FACT_DIR = '/Users/naizhong/Documents/project/fund_price/fact_sheet/'
-OUTPUT_FILE = '/Users/naizhong/Documents/project/fund_price/fund_facts.js'
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+FACT_DIR = os.path.join(SCRIPT_DIR, 'fact_sheet')
+OUTPUT_FILE = os.path.join(SCRIPT_DIR, 'fund_facts.js')
 
 
 def extract_text(pdf_path):

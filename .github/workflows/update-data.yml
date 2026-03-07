@@ -27,7 +27,12 @@ jobs:
         run: python download_prices.py
 
       - name: Extract fact sheet data
-        run: python extract_facts.py
+        run: |
+          if [ -d "fact_sheet" ]; then
+            python extract_facts.py
+          else
+            echo "No fact_sheet directory, skipping"
+          fi
 
       - name: Commit and push updated data
         run: |
